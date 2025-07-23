@@ -9,7 +9,7 @@ services:
     name: family-hub-backend
     env: node
     plan: starter # You can change this to a paid plan for more resources
-    repo: https://github.com/silkpanda/family_hub_backend # IMPORTANT: Replace with your backend repo URL
+    repo: https://github.com/YOUR_USERNAME/backend # IMPORTANT: Replace with your backend repo URL
     branch: main
     
     # Build and start commands for a standard Node.js app
@@ -23,7 +23,7 @@ services:
     # Secrets should be set in the Render dashboard Environment tab.
     # Values set in the dashboard will override any placeholders here.
     envVars:
-      - key: DATABASE_URL
+      - key: DATABASE_URL # Using DATABASE_URL as per the revert
         fromDatabase:
           name: family-hub-db      # This must match the name of the database service below
           property: connectionString
@@ -37,6 +37,8 @@ services:
         value: YOUR_GOOGLE_CLIENT_ID # Placeholder: Set the real value in the Render dashboard
       - key: GOOGLE_CLIENT_SECRET
         value: YOUR_GOOGLE_CLIENT_SECRET # Placeholder: Set the real value in the Render dashboard
+      - key: ENCRYPTION_KEY
+        value: YOUR_ENCRYPTION_KEY # Placeholder: Set the real value in the Render dashboard
       - key: CLIENT_URL
         value: https://your-netlify-app-name.netlify.app # IMPORTANT: Replace with your frontend's deployed URL
 
