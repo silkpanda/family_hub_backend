@@ -1,39 +1,46 @@
 import jwt from 'jsonwebtoken';
 import User from '../../models/user.model.js';
+import config from '../../config/index.js';
 
-export const protect = async (req, res, next) => {
+// This middleware function, 'protect', is designed to secure API endpoints.
+// It verifies a user's JSON Web Token (JWT) before allowing them to access a route.
+const protect = async (req, res, next) => {
   let token;
 
+  // Check if the request headers contain an Authorization token, and if it's a Bearer token.
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
-      // Get token from header
+      // Extract the token from the 'Authorization: Bearer <TOKEN>' header.
       token = req.headers.authorization.split(' ')[1];
 
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Verify the token using the secret key from our configuration.
+      // This will throw an error if the token is invalid or expired.
+      const decoded = jwt.verify(token, config.jwtSecret);
 
-      // Get user from the token (excluding password) and attach to request
-      // NOTE: You might need to expand this to fetch family info as well
-      req.user = await User.findById(decoded.id).select('-password'); 
+      // Use the ID from the decoded token payload to find the user in the database.
+      // We exclude the user's Google access/refresh tokens for security.
+      req.user = await User.findById(decoded.id).select('-accessToken -refreshToken');
 
-      // For this CRUD, we assume familyId is on the user object.
-      // In a real app, you might fetch the Family document here.
-      // For now, let's assume a simple structure:
-      if (!req.user.familyId) {
-         // In a real app, every user should belong to a family.
-         // This is a placeholder for demonstration.
-         req.user.familyId = 'some_default_family_id_from_user_model';
+      if (!req.user) {
+        res.status(401);
+        throw new Error('Not authorized, user not found');
       }
 
-
+      // If the user is found, attach the user object to the request (req.user)
+      // and call next() to pass control to the next middleware or the route controller.
       next();
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      res.status(401);
+      next(new Error('Not authorized, token failed'));
     }
   }
 
+  // If no token is found in the header, the user is not authorized.
   if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+    res.status(401);
+    next(new Error('Not authorized, no token'));
   }
 };
+
+export { protect };
