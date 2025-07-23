@@ -13,6 +13,7 @@ import './config/passport-setup.js'; // Important: This sets up the Google strat
 // Import routes
 import authRoutes from './api/routes/auth.routes.js';
 import healthCheckRoute from './api/routes/health.routes.js'; // For Render health checks
+import calendarRoutes from './api/routes/calendar.routes.js';
 
 dotenv.config();
 connectDB();
@@ -36,7 +37,9 @@ app.use(passport.initialize());
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', healthCheckRoute);
-// TODO: Add other routes (calendar, lists, etc.) here
+app.use('/api/calendar', calendarRoutes);
+
+// TODO: Add other routes (lists, etc.) here
 
 // Initialize WebSocket handler
 initializeSocket(io);
