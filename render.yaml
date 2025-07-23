@@ -9,7 +9,7 @@ services:
     name: family-hub-backend
     env: node
     plan: starter # You can change this to a paid plan for more resources
-    repo: https://github.com/YOUR_USERNAME/backend # IMPORTANT: Replace with your backend repo URL
+    repo: https://github.com/silkpanda/family_hub_backend # IMPORTANT: Replace with your backend repo URL
     branch: main
     
     # Build and start commands for a standard Node.js app
