@@ -11,50 +11,38 @@ const choreSchema = new Schema({
     type: String,
     trim: true,
   },
+  assignedTo: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    // A chore doesn't have to be assigned to be on the list
+  },
+  // The point value for the rewards system. Can be zero if not used.
+  points: {
+    type: Number,
+    default: 0,
+    min: [0, 'Points cannot be negative.'],
+  },
+  isComplete: {
+    type: Boolean,
+    default: false,
+  },
+  // For recurring chores
+  dueDate: {
+    type: Date,
+  },
   familyId: {
     type: Schema.Types.ObjectId,
     ref: 'Family',
     required: true,
     index: true,
   },
-  // The user who created the chore (e.g., a parent)
   createdBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
   },
-  // The user the chore is assigned to (e.g., a child)
-  assignedTo: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-  },
-  dueDate: {
-    type: Date,
-  },
-  // For the rewards system
-  points: {
-    type: Number,
-    default: 0,
-  },
-  isComplete: {
-    type: Boolean,
-    default: false,
-  },
-  completedBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-  },
-  completedAt: {
-    type: Date,
-  },
-  // For recurring chores (future implementation)
-  // recurring: {
-  //   type: String,
-  //   enum: ['daily', 'weekly', 'monthly', null],
-  //   default: null,
-  // }
 }, {
-  timestamps: true,
+  timestamps: true
 });
 
 const Chore = mongoose.model('Chore', choreSchema);
