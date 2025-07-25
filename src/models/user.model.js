@@ -6,7 +6,7 @@ const userSchema = new Schema({
     type: String,
     required: true,
     unique: true,
-    index: true, // Index for faster lookups
+    index: true,
   },
   displayName: {
     type: String,
@@ -22,34 +22,33 @@ const userSchema = new Schema({
   profilePhotoUrl: {
     type: String,
   },
-  // Tokens for Google API access (e.g., Calendar Sync)
-  // These are sensitive and should be handled with care.
   accessToken: {
     type: String,
     required: true,
   },
   refreshToken: {
     type: String,
-    // A refresh token is crucial for maintaining long-term, offline access 
-    // to Google APIs like Calendar without requiring the user to log in again.
-    // It's typically only provided by Google on the very first authorization consent.
   },
+  // This link is now established during the new onboarding flow.
+  // It is no longer required upon initial user creation.
   familyId: {
     type: Schema.Types.ObjectId,
     ref: 'Family',
-    // This is not required initially, as a user might create a family 
-    // or be invited to one after their account is created.
   },
-  // User-specific color for calendar events, lists, etc.
-  // Can be assigned by the family organizer.
-  color: {
-    type: String,
-    trim: true,
+  // --- NEW ---
+  // This flag tracks if the user has completed the initial setup process
+  // (i.e., created or joined a family).
+  onboardingComplete: {
+    type: Boolean,
+    default: false,
   },
 }, {
-  // Automatically adds createdAt and updatedAt timestamps
   timestamps: true 
 });
+
+// Note: The 'color' field has been moved to the familyMemberSchema
+// inside family.model.js, as the color is specific to a user's role
+// within a particular family.
 
 const User = mongoose.model('User', userSchema);
 

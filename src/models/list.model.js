@@ -38,6 +38,12 @@ const listSchema = new Schema({
   // Embed the list items directly into the list document.
   // This is a good pattern for data that is always accessed together.
   items: [listItemSchema], 
+
+tasks: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Task'
+  }]
+
 }, {
   timestamps: true
 });

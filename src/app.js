@@ -16,7 +16,8 @@ import healthCheckRoute from './api/routes/health.routes.js';
 import calendarRoutes from './api/routes/calendar.routes.js';
 import listRoutes from './api/routes/list.routes.js';
 import choreRoutes from './api/routes/chore.routes.js';
-import mealRoutes from './api/routes/meal.routes.js'; // <-- Import meal routes
+import mealRoutes from './api/routes/meal.routes.js';
+import familyRoutes from './api/routes/family.routes.js'; // <-- Import family routes
 
 // --- Middleware Imports ---
 import errorHandler from './api/middleware/errorHandler.js';
@@ -47,7 +48,8 @@ app.use('/api', healthCheckRoute);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/lists', listRoutes);
 app.use('/api/chores', choreRoutes);
-app.use('/api/meals', mealRoutes); // <-- Use meal routes
+app.use('/api/meals', mealRoutes);
+app.use('/api/family', familyRoutes); // <-- Use family routes
 
 // --- WebSocket Handler ---
 initializeSocket(io);
