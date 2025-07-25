@@ -1,6 +1,6 @@
 import { body, validationResult } from 'express-validator';
 
-// Reusable middleware to handle validation errors.
+// Middleware to handle validation errors
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -9,36 +9,18 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// Validation rules for creating or updating a List document.
-const listValidationRules = () => {
+// Validation rules for creating/updating a list
+export const listValidationRules = () => {
   return [
-    // The name of the list (e.g., "Groceries") is required.
-    body('name')
-      .trim()
-      .not().isEmpty()
-      .withMessage('List name is required.'),
-
-    // The type of list is optional, but if provided, it must be one of the allowed values.
-    body('type')
-      .optional()
-      .isIn(['grocery', 'todo', 'other'])
-      .withMessage('Invalid list type.'),
+    body('name').trim().not().isEmpty().withMessage('List name is required.'),
   ];
 };
 
-// Validation rules for adding or updating an item within a list.
-const itemValidationRules = () => {
+// Validation rules for creating/updating a list item
+export const itemValidationRules = () => {
   return [
-    // The text content of the item (e.g., "Milk") is required.
-    body('text')
-      .trim()
-      .not().isEmpty()
-      .withMessage('List item text cannot be empty.'),
+    body('content').trim().not().isEmpty().withMessage('Item content is required.'),
   ];
 };
 
-export { 
-  listValidationRules, 
-  itemValidationRules, 
-  handleValidationErrors 
-};
+export { handleValidationErrors };

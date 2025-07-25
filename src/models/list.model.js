@@ -1,12 +1,12 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-// This is a schema for the individual items that will go inside a list.
-// It will be used as a sub-document.
+// This is a subdocument schema. It will not have its own model.
+// It will be embedded within the List document.
 const listItemSchema = new Schema({
-  text: {
+  content: {
     type: String,
-    required: [true, 'List item text is required.'],
+    required: [true, 'List item content is required.'],
     trim: true,
   },
   isComplete: {
@@ -18,20 +18,11 @@ const listItemSchema = new Schema({
     ref: 'User',
     required: true,
   },
-  // Track who completed the item, which is useful for chore lists.
-  completedBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-  },
-  completedAt: {
-    type: Date,
-  }
 }, {
-  timestamps: true // Adds createdAt and updatedAt for each item
+  timestamps: true
 });
 
 
-// This is the main schema for the list itself.
 const listSchema = new Schema({
   name: {
     type: String,
@@ -42,18 +33,13 @@ const listSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Family',
     required: true,
-    index: true, // Index for faster querying of lists by family
+    index: true, // Index for faster lookups by family
   },
-  // Embed the listItemSchema as an array of sub-documents.
-  items: [listItemSchema],
-  // You can use a type to differentiate lists for special UI treatment later.
-  type: {
-    type: String,
-    enum: ['grocery', 'todo', 'other'],
-    default: 'other',
-  }
+  // Embed the list items directly into the list document.
+  // This is a good pattern for data that is always accessed together.
+  items: [listItemSchema], 
 }, {
-  timestamps: true, // Adds createdAt and updatedAt for the list document
+  timestamps: true
 });
 
 const List = mongoose.model('List', listSchema);
