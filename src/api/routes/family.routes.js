@@ -8,46 +8,46 @@ import {
     removeFamilyMember,
     joinFamily,
     getFamilyMembers,
-} from '../controllers/family.controller.js'; // This controller will be created next
+    updateFamily, // <-- New import
+} from '../controllers/family.controller.js';
 import {
     createFamilyValidation,
     addMemberValidation,
     updateMemberValidation,
     joinFamilyValidation,
+    updateFamilyValidation, // <-- New import
     handleValidationErrors
-} from '../validators/family.validator.js'; // This validator will be created next
+} from '../validators/family.validator.js';
 
 const router = express.Router();
 
 // All routes in this file are protected and require a user to be logged in.
 router.use(protect);
 
-// @desc    Create a new family (part of the onboarding process)
-// @route   POST /api/family
+// @desc    Create a new family
 router.post('/', createFamilyValidation(), handleValidationErrors, createFamily);
 
 // @desc    Get details of the current user's family
-// @route   GET /api/family
 router.get('/', getFamilyDetails);
 
+// @desc    Update the family's details (e.g., name)
+// @route   PUT /api/family
+router.put('/', updateFamilyValidation(), handleValidationErrors, updateFamily);
+
 // @desc    Get all members of the current user's family
-// @route   GET /api/family/members
 router.get('/members', getFamilyMembers);
 
 // @desc    Add a new member to the family
-// @route   POST /api/family/members
 router.post('/members', addMemberValidation(), handleValidationErrors, addFamilyMember);
 
-// @desc    Update an existing family member's details (e.g., color, role)
+// @desc    Update an existing family member's details (e.g., name, color, role)
 // @route   PUT /api/family/members/:memberId
 router.put('/members/:memberId', updateMemberValidation(), handleValidationErrors, updateFamilyMember);
 
 // @desc    Remove a member from the family
-// @route   DELETE /api/family/members/:memberId
 router.delete('/members/:memberId', removeFamilyMember);
 
 // @desc    Join an existing family using an invite code
-// @route   POST /api/family/join
 router.post('/join', joinFamilyValidation(), handleValidationErrors, joinFamily);
 
 

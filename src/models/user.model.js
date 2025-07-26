@@ -22,22 +22,19 @@ const userSchema = new Schema({
   profilePhotoUrl: {
     type: String,
   },
+  // --- CORRECTED ---
+  // The accessToken is no longer required. A placeholder user or an invited user
+  // will not have an access token until they log in for the first time.
   accessToken: {
     type: String,
-    required: true,
   },
   refreshToken: {
     type: String,
   },
-  // This link is now established during the new onboarding flow.
-  // It is no longer required upon initial user creation.
   familyId: {
     type: Schema.Types.ObjectId,
     ref: 'Family',
   },
-  // --- NEW ---
-  // This flag tracks if the user has completed the initial setup process
-  // (i.e., created or joined a family).
   onboardingComplete: {
     type: Boolean,
     default: false,
@@ -45,10 +42,6 @@ const userSchema = new Schema({
 }, {
   timestamps: true 
 });
-
-// Note: The 'color' field has been moved to the familyMemberSchema
-// inside family.model.js, as the color is specific to a user's role
-// within a particular family.
 
 const User = mongoose.model('User', userSchema);
 
