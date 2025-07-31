@@ -1,99 +1,118 @@
+// ===================================================================================
+// File: /backend/src/api/controllers/calendar.controller.js
+// Purpose: Contains all the business logic for handling calendar-related API requests.
+// ===================================================================================
 import Event from '../../models/event.model.js';
-import { io } from '../../app.js'; // Import socket.io instance for real-time updates
+import { io } from '../../app.js'; // Import the Socket.IO instance
 
-// @desc    Get all events for the user's family
-// @route   GET /api/calendar/events
-// @access  Private
-export const getEvents = async (req, res) => {
+/**
+ * Retrieves all calendar events for the authenticated user's family.
+ * @param {Object} req - The Express request object.
+ * @param {Object} res - The Express response object.
+ * @param {Function} next - The next middleware function.
+ */
+export const getEvents = async (req, res, next) => {
   try {
-    // Assuming user's familyId is attached to req.user by auth middleware
-    const events = await Event.find({ familyId: req.user.familyId }).populate('createdBy', 'displayName').populate('assignedTo', 'displayName');
+    // Find events belonging to the user's family, populate creator and assigned users for display.
+    const events = await Event.find({ familyId: req.user.familyId })
+                                .populate('createdBy', 'displayName')
+                                .populate('assignedTo', 'displayName');
+    console.log(`[CalendarController] Fetched ${events.length} events for family ${req.user.familyId}.`);
     res.status(200).json(events);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
+  } catch (error) { 
+    console.error('[CalendarController] Error fetching events:', error);
+    next(error); 
   }
 };
 
-// @desc    Create a new event
-// @route   POST /api/calendar/events
-// @access  Private
-export const createEvent = async (req, res) => {
+/**
+ * Creates a new calendar event.
+ * Emits a 'event:created' WebSocket event to the family's room.
+ * @param {Object} req - The Express request object, containing event data in `req.body`.
+ * @param {Object} res - The Express response object.
+ * @param {Function} next - The next middleware function.
+ */
+export const createEvent = async (req, res, next) => {
   try {
-    const { title, description, startTime, endTime, isAllDay, color, assignedTo } = req.body;
-    
-    const newEvent = new Event({
-      title,
-      description,
-      startTime,
-      endTime,
-      isAllDay,
-      color,
-      assignedTo,
-      createdBy: req.user.id, // from auth middleware
-      familyId: req.user.familyId, // from auth middleware
+    // Create a new Event document, linking it to the creating user and their family.
+    const newEvent = new Event({ 
+      ...req.body, 
+      createdBy: req.user.id, 
+      familyId: req.user.familyId 
     });
+    await newEvent.save();
 
-    const savedEvent = await newEvent.save();
-    const populatedEvent = await Event.findById(savedEvent._id).populate('createdBy', 'displayName').populate('assignedTo', 'displayName');
+    // Populate the created event for broadcasting (to include displayName, etc.).
+    const populatedEvent = await Event.findById(newEvent._id)
+                                    .populate('createdBy', 'displayName')
+                                    .populate('assignedTo', 'displayName');
 
-    // Emit a real-time update to all members of the family
+    // Emit WebSocket event to all clients in the same family room.
     io.to(req.user.familyId.toString()).emit('event:created', populatedEvent);
-
-    res.status(201).json(populatedEvent);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
-
-// @desc    Update an existing event
-// @route   PUT /api/calendar/events/:id
-// @access  Private
-export const updateEvent = async (req, res) => {
-  try {
-    const event = await Event.findById(req.params.id);
-
-    if (!event) {
-      return res.status(404).json({ message: 'Event not found' });
-    }
-
-    // Check if the user belongs to the same family as the event
-    if (event.familyId.toString() !== req.user.familyId.toString()) {
-      return res.status(403).json({ message: 'User not authorized to update this event' });
-    }
-
-    const updatedEvent = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }).populate('createdBy', 'displayName').populate('assignedTo', 'displayName');
+    console.log(`[CalendarController] Emitted 'event:created' for family ${req.user.familyId}: ${populatedEvent.title}`);
     
-    // Emit a real-time update
-    io.to(req.user.familyId.toString()).emit('event:updated', updatedEvent);
-
-    res.status(200).json(updatedEvent);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    res.status(201).json(populatedEvent);
+  } catch (error) { 
+    console.error('[CalendarController] Error creating event:', error);
+    next(error); 
   }
 };
 
-// @desc    Delete an event
-// @route   DELETE /api/calendar/events/:id
-// @access  Private
-export const deleteEvent = async (req, res) => {
+/**
+ * Updates an existing calendar event.
+ * Emits an 'event:updated' WebSocket event to the family's room.
+ * @param {Object} req - The Express request object, with `id` in `req.params` and updated data in `req.body`.
+ * @param {Object} res - The Express response object.
+ * @param {Function} next - The next middleware function.
+ */
+export const updateEvent = async (req, res, next) => {
   try {
-    const event = await Event.findById(req.params.id);
-
-    if (!event) {
-      return res.status(404).json({ message: 'Event not found' });
+    // Find the event by ID and ensure it belongs to the user's family.
+    const event = await Event.findOne({ _id: req.params.id, familyId: req.user.familyId });
+    if (!event) { 
+      console.warn(`[CalendarController] Event ${req.params.id} not found or not in family ${req.user.familyId}.`);
+      return res.status(404).json({ message: 'Event not found' }); 
     }
 
-    if (event.familyId.toString() !== req.user.familyId.toString()) {
-      return res.status(403).json({ message: 'User not authorized to delete this event' });
+    // Update the event, returning the new document.
+    const updatedEvent = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true })
+                                    .populate('createdBy', 'displayName')
+                                    .populate('assignedTo', 'displayName');
+
+    // Emit WebSocket event to all clients in the same family room.
+    io.to(req.user.familyId.toString()).emit('event:updated', updatedEvent);
+    console.log(`[CalendarController] Emitted 'event:updated' for family ${req.user.familyId}: ${updatedEvent.title}`);
+    
+    res.status(200).json(updatedEvent);
+  } catch (error) { 
+    console.error(`[CalendarController] Error updating event ${req.params.id}:`, error);
+    next(error); 
+  }
+};
+
+/**
+ * Deletes a calendar event.
+ * Emits an 'event:deleted' WebSocket event to the family's room.
+ * @param {Object} req - The Express request object, with `id` in `req.params`.
+ * @param {Object} res - The Express response object.
+ * @param {Function} next - The next middleware function.
+ */
+export const deleteEvent = async (req, res, next) => {
+  try {
+    // Find and delete the event, ensuring it belongs to the user's family.
+    const event = await Event.findOneAndDelete({ _id: req.params.id, familyId: req.user.familyId });
+    if (!event) { 
+      console.warn(`[CalendarController] Event ${req.params.id} not found or not in family ${req.user.familyId} for deletion.`);
+      return res.status(404).json({ message: 'Event not found' }); 
     }
 
-    await event.deleteOne();
-
-    // Emit a real-time update with the ID of the deleted event
+    // Emit WebSocket event with the ID of the deleted event.
     io.to(req.user.familyId.toString()).emit('event:deleted', { id: req.params.id });
-
+    console.log(`[CalendarController] Emitted 'event:deleted' for family ${req.user.familyId}: ID ${req.params.id}`);
+    
     res.status(200).json({ message: 'Event deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
+  } catch (error) { 
+    console.error(`[CalendarController] Error deleting event ${req.params.id}:`, error);
+    next(error); 
   }
 };
