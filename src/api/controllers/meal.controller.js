@@ -1,11 +1,24 @@
+// ===================================================================================
+// File: /backend/src/api/controllers/meal.controller.js
+// Purpose: Contains business logic for meal and recipe API requests.
+//
+// --- Dev Notes (UPDATE) ---
+// - BUG FIX: The dashboard was not updating after the meal plan was changed.
+// - SOLUTION:
+//   - Imported the `io` instance for WebSocket communication.
+//   - In both `addRecipeToPlan` and `removeRecipeFromPlan`, after the database is
+//     updated, we now emit a `mealplan:updated` event to the family's private room.
+//   - This event broadcasts the entire updated meal plan to all connected clients,
+//     ensuring their UIs stay in sync in real-time.
+// ===================================================================================
 import Recipe from '../../models/recipe.model.js';
 import MealPlan from '../../models/mealPlan.model.js';
 import List from '../../models/list.model.js';
+import { io } from '../../app.js'; // --- NEW ---
 
 async function getAndPopulateMealPlan(familyId) {
     const mealPlan = await MealPlan.findOne({ familyId }).populate('plan.$*.recipeId');
-    if (!mealPlan) return { plan: {} }; // Return a default structure if no plan exists
-
+    if (!mealPlan) return { plan: {} };
     const populatedPlan = { _id: mealPlan._id, familyId: mealPlan.familyId, plan: {} };
     for (const [date, meals] of mealPlan.plan.entries()) {
         populatedPlan.plan[date] = meals.filter(meal => meal.recipeId != null);
@@ -13,6 +26,54 @@ async function getAndPopulateMealPlan(familyId) {
     return populatedPlan;
 }
 
+export const addRecipeToPlan = async (req, res, next) => {
+    try {
+        const { recipeId, date, mealType } = req.body;
+        const dateKey = new Date(date).toISOString().split('T')[0];
+        let mealPlan = await MealPlan.findOne({ familyId: req.user.familyId });
+        if (!mealPlan) { mealPlan = await MealPlan.create({ familyId: req.user.familyId, plan: {} }); }
+        const dayMeals = mealPlan.plan.get(dateKey) || [];
+        const existingMealIndex = dayMeals.findIndex(m => m.mealType === mealType);
+        if (existingMealIndex > -1) {
+            dayMeals[existingMealIndex].recipeId = recipeId;
+        } else {
+            dayMeals.push({ recipeId, mealType });
+        }
+        mealPlan.plan.set(dateKey, dayMeals);
+        await mealPlan.save();
+        const populatedPlan = await getAndPopulateMealPlan(req.user.familyId);
+
+        // --- NEW --- Emit the update to all clients in the family
+        io.to(req.user.familyId.toString()).emit('mealplan:updated', populatedPlan);
+
+        res.status(200).json(populatedPlan);
+    } catch (error) { next(error); }
+};
+
+export const removeRecipeFromPlan = async (req, res, next) => {
+    try {
+        const { date, mealType } = req.body;
+        const dateKey = new Date(date).toISOString().split('T')[0];
+        const mealPlan = await MealPlan.findOne({ familyId: req.user.familyId });
+        if (!mealPlan || !mealPlan.plan.has(dateKey)) { return res.status(404).json({ message: 'Meal plan entry not found' }); }
+        const dayMeals = mealPlan.plan.get(dateKey).filter(m => m.mealType !== mealType);
+        if (dayMeals.length > 0) {
+            mealPlan.plan.set(dateKey, dayMeals);
+        } else {
+            mealPlan.plan.delete(dateKey);
+        }
+        await mealPlan.save();
+        const populatedPlan = await getAndPopulateMealPlan(req.user.familyId);
+
+        // --- NEW --- Emit the update to all clients in the family
+        io.to(req.user.familyId.toString()).emit('mealplan:updated', populatedPlan);
+
+        res.status(200).json(populatedPlan);
+    } catch (error) { next(error); }
+};
+
+
+// --- UNCHANGED FUNCTIONS ---
 export const getAllRecipes = async (req, res, next) => {
     try {
         const recipes = await Recipe.find({ familyId: req.user.familyId });
@@ -48,42 +109,6 @@ export const deleteRecipe = async (req, res, next) => {
 };
 export const getMealPlan = async (req, res, next) => {
     try {
-        const populatedPlan = await getAndPopulateMealPlan(req.user.familyId);
-        res.status(200).json(populatedPlan);
-    } catch (error) { next(error); }
-};
-export const addRecipeToPlan = async (req, res, next) => {
-    try {
-        const { recipeId, date, mealType } = req.body;
-        const dateKey = new Date(date).toISOString().split('T')[0];
-        let mealPlan = await MealPlan.findOne({ familyId: req.user.familyId });
-        if (!mealPlan) { mealPlan = await MealPlan.create({ familyId: req.user.familyId, plan: {} }); }
-        const dayMeals = mealPlan.plan.get(dateKey) || [];
-        const existingMealIndex = dayMeals.findIndex(m => m.mealType === mealType);
-        if (existingMealIndex > -1) {
-            dayMeals[existingMealIndex].recipeId = recipeId;
-        } else {
-            dayMeals.push({ recipeId, mealType });
-        }
-        mealPlan.plan.set(dateKey, dayMeals);
-        await mealPlan.save();
-        const populatedPlan = await getAndPopulateMealPlan(req.user.familyId);
-        res.status(200).json(populatedPlan);
-    } catch (error) { next(error); }
-};
-export const removeRecipeFromPlan = async (req, res, next) => {
-    try {
-        const { date, mealType } = req.body;
-        const dateKey = new Date(date).toISOString().split('T')[0];
-        const mealPlan = await MealPlan.findOne({ familyId: req.user.familyId });
-        if (!mealPlan || !mealPlan.plan.has(dateKey)) { return res.status(404).json({ message: 'Meal plan entry not found' }); }
-        const dayMeals = mealPlan.plan.get(dateKey).filter(m => m.mealType !== mealType);
-        if (dayMeals.length > 0) {
-            mealPlan.plan.set(dateKey, dayMeals);
-        } else {
-            mealPlan.plan.delete(dateKey);
-        }
-        await mealPlan.save();
         const populatedPlan = await getAndPopulateMealPlan(req.user.familyId);
         res.status(200).json(populatedPlan);
     } catch (error) { next(error); }
