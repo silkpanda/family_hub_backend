@@ -1,12 +1,13 @@
-// ===================================================================================
-// File: /backend/src/api/validators/calendar.validator.js
-// ===================================================================================
+// Defines validation rules for calendar-related API requests using express-validator.
+
 import { body, validationResult } from 'express-validator';
+
 export const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   next();
 };
+
 export const eventValidationRules = () => [
   body('title').trim().not().isEmpty().withMessage('Title is required.'),
   body('startTime').isISO8601().toDate().withMessage('Valid start time is required.'),

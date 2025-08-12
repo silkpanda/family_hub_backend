@@ -1,3 +1,5 @@
+// Defines validation rules for chore-related API requests.
+
 import { body, validationResult } from 'express-validator';
 
 export const handleValidationErrors = (req, res, next) => {

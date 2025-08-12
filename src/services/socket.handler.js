@@ -1,28 +1,27 @@
-// ===================================================================================
-// File: /backend/src/services/socket.handler.js
-// Purpose: Defines how the WebSocket server handles events from connected clients.
-// ===================================================================================
+// --- File: /backend/src/services/socket.handler.js ---
+// This file initializes and handles all Socket.IO server-side events.
+
 const initializeSocket = (io) => {
     io.on('connection', (socket) => {
-        console.log('[Socket.IO Server] A user connected:', socket.id);
+        // **DEBUGGING:** Log when a new client connects.
+        console.log(`[Socket.IO Server] A user connected successfully: ${socket.id}`);
 
-        // This listener allows a client to join a private room based on their family ID.
-        // This is crucial for ensuring real-time updates are only sent to members
-        // of the correct family.
+        // 'joinFamily' event: Allows a client to join a room specific to their family.
         socket.on('joinFamily', (familyId) => {
-            // Log the family ID being joined
-            console.log(`[Socket.IO Server] Socket ${socket.id} attempting to join family room: ${familyId}`);
+            console.log(`[Socket.IO Server] Socket ${socket.id} is joining family room: ${familyId}`);
             socket.join(familyId);
-            console.log(`[Socket.IO Server] Socket ${socket.id} successfully joined family room ${familyId}`);
         });
 
-        socket.on('disconnect', () => {
-            console.log('[Socket.IO Server] User disconnected:', socket.id);
+        // **DEBUGGING:** Listen for the disconnect event and, most importantly, log the reason.
+        // The 'reason' will tell us why the server is closing the connection.
+        socket.on('disconnect', (reason) => {
+            console.error(`[Socket.IO Server] User disconnected: ${socket.id}. Reason: ${reason}`);
         });
 
         socket.on('error', (err) => {
-            console.error('[Socket.IO Server] Socket error:', err.message);
+            console.error('[Socket.IO Server] A socket error occurred:', err.message);
         });
     });
 };
+
 export default initializeSocket;

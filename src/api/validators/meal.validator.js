@@ -1,12 +1,13 @@
-// ===================================================================================
-// File: /backend/src/api/validators/meal.validator.js
-// ===================================================================================
+// Defines validation rules for meal and recipe-related API requests.
+
 import { body, validationResult } from 'express-validator';
+
 export const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   next();
 };
+
 export const recipeValidationRules = () => [
     body('name').trim().not().isEmpty().withMessage('Recipe name is required.'),
     body('instructions').trim().not().isEmpty().withMessage('Instructions are required.'),
@@ -15,6 +16,7 @@ export const recipeValidationRules = () => [
     body('prepTime').optional().isNumeric().withMessage('Prep time must be a number.'),
     body('cookTime').optional().isNumeric().withMessage('Cook time must be a number.'),
 ];
+
 export const mealPlanValidationRules = () => [
     body('recipeId').isMongoId().withMessage('A valid recipe ID is required.'),
     body('date').isISO8601().toDate().withMessage('A valid date in YYYY-MM-DD format is required.'),

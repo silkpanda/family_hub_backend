@@ -1,25 +1,16 @@
-// ===================================================================================
-// File: /backend/src/api/controllers/meal.controller.js
-// Purpose: Contains business logic for meal and recipe API requests.
-//
-// --- Dev Notes (UPDATE) ---
-// - BUG FIX: The dashboard was not updating after the meal plan was changed.
-// - SOLUTION:
-//   - Imported the `io` instance for WebSocket communication.
-//   - In both `addRecipeToPlan` and `removeRecipeFromPlan`, after the database is
-//     updated, we now emit a `mealplan:updated` event to the family's private room.
-//   - This event broadcasts the entire updated meal plan to all connected clients,
-//     ensuring their UIs stay in sync in real-time.
-// ===================================================================================
+// Handles the business logic for recipe and meal plan management.
+
 import Recipe from '../../models/recipe.model.js';
 import MealPlan from '../../models/mealPlan.model.js';
 import List from '../../models/list.model.js';
-import { io } from '../../app.js'; // --- NEW ---
+import { io } from '../../app.js';
 
+// Helper to retrieve and populate the meal plan with recipe details.
 async function getAndPopulateMealPlan(familyId) {
     const mealPlan = await MealPlan.findOne({ familyId }).populate('plan.$*.recipeId');
-    if (!mealPlan) return { plan: {} };
+    if (!mealPlan) return { plan: {} }; // Return an empty plan if none exists.
     const populatedPlan = { _id: mealPlan._id, familyId: mealPlan.familyId, plan: {} };
+    // Mongoose Map requires manual iteration to ensure proper population.
     for (const [date, meals] of mealPlan.plan.entries()) {
         populatedPlan.plan[date] = meals.filter(meal => meal.recipeId != null);
     }
@@ -42,10 +33,7 @@ export const addRecipeToPlan = async (req, res, next) => {
         mealPlan.plan.set(dateKey, dayMeals);
         await mealPlan.save();
         const populatedPlan = await getAndPopulateMealPlan(req.user.familyId);
-
-        // --- NEW --- Emit the update to all clients in the family
         io.to(req.user.familyId.toString()).emit('mealplan:updated', populatedPlan);
-
         res.status(200).json(populatedPlan);
     } catch (error) { next(error); }
 };
@@ -64,16 +52,11 @@ export const removeRecipeFromPlan = async (req, res, next) => {
         }
         await mealPlan.save();
         const populatedPlan = await getAndPopulateMealPlan(req.user.familyId);
-
-        // --- NEW --- Emit the update to all clients in the family
         io.to(req.user.familyId.toString()).emit('mealplan:updated', populatedPlan);
-
         res.status(200).json(populatedPlan);
     } catch (error) { next(error); }
 };
 
-
-// --- UNCHANGED FUNCTIONS ---
 export const getAllRecipes = async (req, res, next) => {
     try {
         const recipes = await Recipe.find({ familyId: req.user.familyId });

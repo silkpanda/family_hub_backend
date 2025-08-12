@@ -1,9 +1,8 @@
-// ===================================================================================
-// File: /backend/src/models/user.model.js
-// ===================================================================================
-import mongoose from 'mongoose';
-const { Schema } = mongoose;
+// Defines the Mongoose schema for a User.
 
+import mongoose from 'mongoose';
+
+const { Schema } = mongoose;
 
 const userSchema = new Schema({
   googleId: { type: String, required: true, unique: true, index: true },
@@ -16,6 +15,6 @@ const userSchema = new Schema({
   onboardingComplete: { type: Boolean, default: false },
 }, { timestamps: true });
 
-
 const User = mongoose.model('User', userSchema);
+
 export default User;

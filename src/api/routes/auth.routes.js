@@ -1,15 +1,18 @@
-// /backend/src/api/routes/auth.routes.js
+// Defines the authentication routes for the application.
 
 import express from 'express';
 import passport from 'passport';
-import { googleCallback } from '../controllers/auth.controller.js';
+import { googleCallback, loginWithPin } from '../controllers/auth.controller.js';
 
 const authRouter = express.Router();
 
-// Route to start the Google login flow
-authRouter.get('/google', passport.authenticate('google', { scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar'], accessType: 'offline', prompt: 'consent' }));
+// Route to initiate Google OAuth authentication.
+authRouter.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], accessType: 'offline', prompt: 'consent' }));
 
-// The real callback route that processes the login
+// Callback route that Google redirects to after successful authentication.
 authRouter.get('/google/callback', passport.authenticate('google', { failureRedirect: '/login-failure', session: false }), googleCallback);
+
+// Route for parent users to log in using their 4-digit PIN.
+authRouter.post('/pin-login', loginWithPin);
 
 export default authRouter;
