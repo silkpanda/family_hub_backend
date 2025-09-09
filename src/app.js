@@ -3,61 +3,67 @@ const http = require('http');
 const { Server } = require("socket.io");
 const connectDB = require('./config/db');
 const cors = require('cors');
-const passport = require('passport'); // Import passport
-const session = require('express-session'); // Import express-session
+const passport = require('passport');
+const session = require('express-session');
 
-// --- Import Passport Config ---
-// This line executes the passport configuration file.
 require('./config/passport');
 
-// --- Route Imports ---
 const authRoutes = require('./routes/auth.routes');
 const householdRoutes = require('./routes/household.routes');
 const invitationRoutes = require('./routes/invitation.routes');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:3000",
-        methods: ["GET", "POST", "PUT", "DELETE"]
+
+// --- CORS Configuration ---
+// Define the list of allowed origins (URLs that can make requests to your backend)
+const whitelist = [
+    process.env.CLIENT_URL || 'http://localhost:3000', // Your deployed frontend URL from .env
+    'https://your-netlify-frontend-url.netlify.app' // Add your specific Netlify URL here
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
+  }
+};
+
+const io = new Server(server, {
+    cors: corsOptions // Use the same CORS options for Socket.IO
 });
 
 app.set('socketio', io);
 connectDB();
 
-// --- Middleware ---
-app.use(cors());
+// Use the configured CORS options for all Express routes
+app.use(cors(corsOptions));
 app.use(express.json());
 
-// --- Session Middleware for Passport ---
-// This must come BEFORE the Passport middleware
 app.use(
     session({
-        secret: process.env.SESSION_SECRET || 'a secret key for development', // Use an environment variable in production
+        secret: process.env.SESSION_SECRET || 'a secret key for development',
         resave: false,
         saveUninitialized: false,
     })
 );
 
-// --- Passport Middleware ---
-// Initialize passport and have it use sessions
 app.use(passport.initialize());
-app.use(passport.session()); // This allows passport to use the session to store user data
+app.use(passport.session());
 
-// --- Request Logger Middleware ---
 app.use((req, res, next) => {
     console.log(`[Request Logger] Method: ${req.method}, URL: ${req.originalUrl}`);
     next();
 });
 
-// --- API Routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/households', householdRoutes);
 app.use('/api/invitations', invitationRoutes);
 
-// --- WebSocket Connection ---
 io.on('connection', (socket) => {
     console.log('A user connected via WebSocket');
     socket.on('joinHouseholdRoom', (householdId) => {
