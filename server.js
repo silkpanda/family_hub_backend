@@ -1,35 +1,14 @@
-// FILE: /server.js (Project Root - The main entry point)
-const http = require('http');
+// Load environment variables from .env file right at the start
 const dotenv = require('dotenv');
-// --- Environment Variable Setup ---
 dotenv.config();
-const connectDB = require('./src/config/db');
-const app = require('./src/app'); // Import the configured Express app
-const { Server } = require("socket.io");
 
+// Import the configured server instance from app.js
+const { server } = require('./src/app');
 
-
-
-// --- Database Connection ---
-connectDB();
-
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
-
-// --- WebSocket Connection Handling ---
-io.on('connection', (socket) => {
-    console.log('A user connected via WebSocket');
-    socket.on('joinHouseholdRoom', (householdId) => {
-        socket.join(householdId);
-        console.log(`Socket ${socket.id} joined room ${householdId}`);
-    });
-    socket.on('disconnect', () => {
-        console.log('User disconnected');
-    });
-});
-
-// Make socket.io instance available to the rest of the app
-app.set('socketio', io);
-
+// Define the port
 const PORT = process.env.PORT || 5000;
+
+// Start the server
+// All setup (DB connection, Socket.IO, etc.) is now handled in app.js
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+

@@ -1,11 +1,18 @@
-// FILE: /src/routes/calendar.routes.js
 const express = require('express');
-const router = express.Router();
-const { getAuthUrl, handleCallback, listCalendars } = require('../controllers/calendar.controller');
-const { protect } = require('../middleware/auth.middleware');
+const calendarController = require('../controllers/calendar.controller');
+const router = express.Router({ mergeParams: true });
 
-router.get('/auth/url', protect, getAuthUrl);
-router.get('/auth/callback', handleCallback);
-router.get('/list', protect, listCalendars);
+// GET all events for the household
+router.get('/', calendarController.getEvents);
+
+// POST a new event
+router.post('/', calendarController.addEvent);
+
+// PUT to update an event
+router.put('/:eventId', calendarController.updateEvent);
+
+// DELETE an event
+router.delete('/:eventId', calendarController.deleteEvent);
 
 module.exports = router;
+

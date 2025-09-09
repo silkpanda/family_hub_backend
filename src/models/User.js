@@ -1,4 +1,3 @@
-// FILE: /src/models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -13,7 +12,8 @@ const UserSchema = new mongoose.Schema({
     pinIsSet: { type: Boolean, default: false },
     isPlaceholder: { type: Boolean, default: false },
     points: { type: Number, default: 0 },
-    googleRefreshToken: { type: String }
+    // NEW FIELD: To store the ID of the linked Google Calendar
+    googleCalendarId: { type: String, default: null },
 }, { timestamps: true });
 
 UserSchema.pre('save', async function(next) {
@@ -27,4 +27,6 @@ UserSchema.methods.matchPin = async function(enteredPin) {
     return await bcrypt.compare(enteredPin, this.pin);
 };
 
-module.exports = mongoose.model('User', UserSchema);
+const User = mongoose.model('User', UserSchema);
+
+module.exports = User;

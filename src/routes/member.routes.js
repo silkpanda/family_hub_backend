@@ -1,11 +1,15 @@
-// FILE: /src/routes/member.routes.js
 const express = require('express');
-const router = express.Router();
-const { addMember, updateMember, deleteMember } = require('../controllers/member.controller');
-const { protect, isHouseholdMember } = require('../middleware/auth.middleware');
+const memberController = require('../controllers/member.controller');
 
-router.post('/:householdId/members', protect, isHouseholdMember, addMember);
-router.put('/:householdId/members/:memberId', protect, isHouseholdMember, updateMember);
-router.delete('/:householdId/members/:memberId', protect, isHouseholdMember, deleteMember);
+const memberRouter = express.Router({ mergeParams: true });
 
-module.exports = router;
+// The base path (/api/households/:householdId/members) is now handled by the main household router.
+// These routes are relative to that base path.
+memberRouter.post('/', memberController.addMember);
+memberRouter.put('/:memberId', memberController.updateMember);
+memberRouter.delete('/:memberId', memberController.deleteMember);
+memberRouter.post('/:memberId/link-calendar', memberController.linkCalendar);
+memberRouter.put('/:memberId/color', memberController.updateMemberColor);
+
+module.exports = memberRouter;
+

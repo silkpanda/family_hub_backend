@@ -1,45 +1,100 @@
-// FILE: /src/controllers/calendar.controller.js
-const { google } = require('googleapis');
-const User = require('../models/User');
+const Household = require('../models/Household');
 
-const getOauth2Client = (refreshToken) => {
-    const oauth2Client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_CALLBACK_URL);
-    oauth2Client.setCredentials({ refresh_token: refreshToken });
-    return oauth2Client;
-};
+// Helper function to get the Socket.IO instance from the request
+const getSocketIo = (req) => req.app.get('socketio');
 
-const getAuthUrl = (req, res) => {
-    const oauth2Client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_CALLBACK_URL);
-    const scopes = ['https://www.googleapis.com/auth/calendar'];
-    const url = oauth2Client.generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: scopes, state: req.user.id });
-    res.status(200).json({ url });
-};
+// --- Controller Functions ---
 
-const handleCallback = async (req, res) => {
-    const { code, state } = req.query;
-    const userId = state;
-    const oauth2Client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_CALLBACK_URL);
+const getEvents = async (req, res) => {
     try {
-        const { tokens } = await oauth2Client.getToken(code);
-        if (tokens.refresh_token) {
-            await User.findByIdAndUpdate(userId, { googleRefreshToken: tokens.refresh_token });
+        const { householdId } = req.params;
+        const household = await Household.findById(householdId).select('calendarEvents');
+        if (!household) {
+            return res.status(404).json({ message: 'Household not found' });
         }
-        res.redirect(`${process.env.CLIENT_URL}/manage?calendar_auth=success`);
+        res.status(200).json(household.calendarEvents || []);
     } catch (error) {
-        res.redirect(`${process.env.CLIENT_URL}/manage?calendar_auth=error`);
+        res.status(500).json({ message: 'Server error fetching events', error: error.message });
     }
 };
 
-const listCalendars = async (req, res) => {
-    if (!req.user.googleRefreshToken) return res.status(400).json({ message: 'Google Calendar not connected.' });
+const addEvent = async (req, res) => {
+    const { householdId } = req.params;
+    const { title, start, end, allDay } = req.body;
+    const io = getSocketIo(req);
+
     try {
-        const oauth2Client = getOauth2Client(req.user.googleRefreshToken);
-        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-        const result = await calendar.calendarList.list();
-        res.status(200).json(result.data.items);
+        const household = await Household.findById(householdId);
+        if (!household) {
+            return res.status(404).json({ message: 'Household not found' });
+        }
+
+        household.calendarEvents.push({ title, start, end, allDay });
+        await household.save();
+
+        // Get the newly created event (it will be the last one in the array)
+        const newEvent = household.calendarEvents[household.calendarEvents.length - 1];
+
+        // Emit a WebSocket event to all clients in the household room
+        io.to(householdId).emit('event_created', newEvent);
+
+        res.status(201).json(newEvent);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch calendar list.' });
+        res.status(400).json({ message: 'Error adding event', error: error.message });
     }
 };
 
-module.exports = { getAuthUrl, handleCallback, listCalendars };
+const updateEvent = async (req, res) => {
+    const { householdId, eventId } = req.params;
+    const eventUpdates = req.body;
+    const io = getSocketIo(req);
+
+    try {
+        const household = await Household.findById(householdId);
+        if (!household) {
+            return res.status(404).json({ message: 'Household not found' });
+        }
+
+        const event = household.calendarEvents.id(eventId);
+        if (!event) {
+            return res.status(404).json({ message: 'Event not found' });
+        }
+
+        event.set(eventUpdates);
+        await household.save();
+        
+        // After saving, the 'event' object has the updated data
+        io.to(householdId).emit('event_updated', event);
+
+        res.status(200).json(event);
+    } catch (error) {
+        res.status(400).json({ message: 'Error updating event', error: error.message });
+    }
+};
+
+const deleteEvent = async (req, res) => {
+    const { householdId, eventId } = req.params;
+    const io = getSocketIo(req);
+
+    try {
+        await Household.updateOne(
+            { _id: householdId },
+            { $pull: { calendarEvents: { _id: eventId } } }
+        );
+
+        // Emit a WebSocket event with the ID of the deleted event
+        io.to(householdId).emit('event_deleted', eventId);
+
+        res.status(200).json({ message: 'Event deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting event', error: error.message });
+    }
+};
+
+module.exports = {
+    getEvents,
+    addEvent,
+    updateEvent,
+    deleteEvent,
+};
+
