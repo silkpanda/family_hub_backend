@@ -12,15 +12,20 @@ router.get('/google', passport.authenticate('google', {
 
 // --- The Callback Route ---
 // After the user approves the login on Google's site, Google sends them back here.
+// This version uses a custom callback for a more robust, explicit session handling.
 router.get(
     '/google/callback',
-    passport.authenticate('google', {
-        // --- THIS IS THE CRITICAL FIX ---
-        // On success, redirect to the frontend dashboard.
-        // On failure, redirect back to the frontend login page.
-        successRedirect: process.env.CLIENT_URL,
-        failureRedirect: `${process.env.CLIENT_URL}/login`
-    })
+    // First, Passport authenticates the request.
+    passport.authenticate('google', { failureRedirect: `${process.env.CLIENT_URL}/login` }),
+    // If authentication is successful, this function is executed.
+    (req, res) => {
+        // req.login() is a Passport function that establishes the session.
+        // We are ensuring the session is saved before redirecting.
+        req.session.save(() => {
+            console.log('[Auth Routes] Session saved. Redirecting to client URL.');
+            res.redirect(process.env.CLIENT_URL);
+        });
+    }
 );
 
 // --- Get Current User Session ---
