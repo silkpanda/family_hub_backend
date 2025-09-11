@@ -2,55 +2,46 @@ const express = require('express');
 const passport = require('passport');
 const router = express.Router();
 
-// Route to start the Google authentication process
-router.get(
-    '/google',
-    passport.authenticate('google', {
-        scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar.readonly'],
-        accessType: 'offline',
-        prompt: 'consent'
-    })
-);
+// --- The Main Google Authentication Route ---
+// When the user clicks "Login with Google", they are sent to this endpoint.
+// Passport then redirects them to Google's authentication screen.
+router.get('/google', passport.authenticate('google', {
+    scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar.readonly']
+}));
 
-// --- THIS IS THE FIX ---
-// This is the callback route that Google will redirect to after a successful login.
-// It is now configured to redirect the user back to your live Netlify frontend.
+
+// --- The Callback Route ---
+// After the user approves the login on Google's site, Google sends them back here.
 router.get(
     '/google/callback',
-    passport.authenticate('google', {
-        failureRedirect: `${process.env.CLIENT_URL}/login`, // Redirect to login on failure
-    }),
+    passport.authenticate('google', { failureRedirect: '/login' }), // If login fails, send back to login page
     (req, res) => {
-        // On successful authentication, redirect to the frontend dashboard.
-        res.redirect(`${process.env.CLIENT_URL}/dashboard`);
+        // If authentication is successful, redirect to the frontend's main dashboard.
+        // It's crucial to use the CLIENT_URL from your environment variables.
+        res.redirect(process.env.CLIENT_URL || 'http://localhost:3000');
     }
 );
 
-// Route to check the current user's session status
+// --- Get Current User Session ---
+// The frontend calls this endpoint on startup to check if a user is already logged in.
 router.get('/session', (req, res) => {
     if (req.user) {
-        res.json({
-            isAuthenticated: true,
-            user: req.user,
-            activeHouseholdId: req.session.activeHouseholdId || null,
-        });
+        // If a user is found in the session, send their details back.
+        res.status(200).json({ user: req.user });
     } else {
-        res.status(401).json({ isAuthenticated: false });
+        // If no user is found, send a 401 Unauthorized status.
+        res.status(401).json({ message: 'Not authenticated' });
     }
 });
 
-// Route to handle user logout
+// --- Logout Route ---
 router.post('/logout', (req, res, next) => {
-    req.logout((err) => {
-        if (err) {
-            return next(err);
-        }
-        req.session.destroy((err) => {
-            if (err) {
-                return res.status(500).json({ message: 'Could not log out, please try again.' });
-            }
-            res.clearCookie('connect.sid'); // The default session cookie name
-            res.status(200).json({ message: 'Logged out successfully' });
+    req.logout(function(err) {
+        if (err) { return next(err); }
+        // After logging out, destroy the session and clear the cookie.
+        req.session.destroy(() => {
+            res.clearCookie('connect.sid');
+            res.status(200).json({ message: 'Successfully logged out' });
         });
     });
 });
