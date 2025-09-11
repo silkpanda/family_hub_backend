@@ -1,62 +1,65 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const User = require('../models/User');
-const Household = require('../models/Household');
+const User = require('../models/User'); // Ensure this path is correct
 
+// --- Session Management ---
+// These functions tell Passport how to save and retrieve user information from the session.
+
+// Saves the user's ID to the session cookie.
+passport.serializeUser((user, done) => {
+    done(null, user.id);
+});
+
+// Retrieves the full user details from the database using the ID from the session cookie.
+passport.deserializeUser(async (id, done) => {
+    try {
+        const user = await User.findById(id);
+        done(null, user);
+    } catch (err) {
+        done(err, null);
+    }
+});
+
+
+// --- Google OAuth 2.0 Strategy ---
+// This is the core logic for handling the Google login process.
 passport.use(
-    new GoogleStrategy(
-        {
+    new GoogleStrategy({
+            // These options MUST match the settings in your Google Cloud Console.
             clientID: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            callbackURL: '/api/auth/google/callback',
-            proxy: true
+            // The callbackURL must be the absolute URL of your backend.
+            callbackURL: `${process.env.APP_BASE_URL}/api/auth/google/callback`,
         },
+        // This 'verify' function is called after Google successfully authenticates the user.
         async (accessToken, refreshToken, profile, done) => {
             try {
-                // Check if user already exists in our database
-                let user = await User.findOne({ googleId: profile.id });
+                // Check if a user with this Google ID already exists in your database.
+                const existingUser = await User.findOne({ googleId: profile.id });
 
-                if (user) {
-                    // If user exists, just return them
-                    return done(null, user);
-                } else {
-                    // If not, create a new user in our database
-                    const newUser = await User.create({
-                        googleId: profile.id,
-                        displayName: profile.displayName,
-                        email: profile.emails[0].value,
-                        image: profile.photos[0].value,
-                    });
-                    
-                    // Also create a new household for this new user
-                    const newHousehold = await Household.create({
-                        name: `${profile.displayName}'s Household`,
-                        members: [{ user: newUser._id, color: '#4CAF50' }] // Add them as the first member
-                    });
-
-                    // Add the household to the user's record
-                    newUser.households.push(newHousehold._id);
-                    await newUser.save();
-
-                    return done(null, newUser);
+                if (existingUser) {
+                    // If the user exists, return them to proceed with login.
+                    return done(null, existingUser);
                 }
-            } catch (error) {
-                console.error('Error in Google Strategy:', error);
-                return done(error, null);
+
+                // If the user does not exist, create a new user in your database.
+                const newUser = new User({
+                    googleId: profile.id,
+                    displayName: profile.displayName,
+                    email: profile.emails[0].value,
+                    image: profile.photos[0].value,
+                });
+
+                await newUser.save();
+                // Return the newly created user to proceed with login.
+                done(null, newUser);
+
+            } catch (err) {
+                // If any error occurs during the database operation, pass it to Passport.
+                console.error('Error in Google Strategy:', err);
+                return done(err, false);
             }
         }
     )
 );
 
-passport.serializeUser((user, done) => {
-    done(null, user.id);
-});
-
-passport.deserializeUser(async (id, done) => {
-    try {
-        const user = await User.findById(id);
-        done(null, user);
-    } catch (error) {
-        done(error, null);
-    }
-});
