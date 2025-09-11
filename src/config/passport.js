@@ -1,72 +1,76 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const User = require('../models/User'); // Ensure this path is correct
+const User = require('../models/User');
+const Household = require('../models/Household');
 
-// --- Session Management ---
-// These functions tell Passport how to save and retrieve user information from the session.
+// --- THIS IS THE FIX ---
+// We are now using the full, absolute URL for the callback, which is required
+// for a secure, production environment. This ensures there is no ambiguity
+// for Google, your server, or the browser during the authentication handshake.
+const callbackURL = `${process.env.APP_BASE_URL}/api/auth/google/callback`;
 
-// Saves the user's ID to the session cookie.
+passport.use(
+    new GoogleStrategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: callbackURL,
+        proxy: true // Important for environments like Render
+    },
+    async (accessToken, refreshToken, profile, done) => {
+        console.log('[Passport] Google Strategy: Received profile from Google.');
+        const newUser = {
+            googleId: profile.id,
+            displayName: profile.displayName,
+            email: profile.emails[0].value,
+            image: profile.photos[0].value,
+        };
+
+        try {
+            console.log(`[Passport] Google Strategy: Searching for user with googleId: ${profile.id}`);
+            let user = await User.findOne({ googleId: profile.id });
+
+            if (user) {
+                console.log('[Passport] Google Strategy: Found existing user.');
+                // Update user details if they have changed
+                user.displayName = profile.displayName;
+                user.image = profile.photos[0].value;
+                await user.save();
+                done(null, user);
+            } else {
+                console.log('[Passport] Google Strategy: User not found, creating new user.');
+                user = await User.create(newUser);
+                
+                console.log('[Passport] Google Strategy: Creating a new household for the new user.');
+                const newHousehold = await Household.create({
+                    name: `${user.displayName}'s Household`,
+                    members: [{ user: user._id, role: 'parent', color: '#4CAF50' }] 
+                });
+
+                user.households.push(newHousehold._id);
+                user.activeHouseholdId = newHousehold._id;
+                await user.save();
+                console.log('[Passport] Google Strategy: New user and household created successfully.');
+                done(null, user);
+            }
+        } catch (err) {
+            console.error('[Passport] Google Strategy: Error during user lookup or creation.', err);
+            done(err, null);
+        }
+    })
+);
+
 passport.serializeUser((user, done) => {
-    console.log('[Passport] Serializing user:', user.id);
+    console.log(`[Passport] Serializing user: ${user.id}`);
     done(null, user.id);
 });
 
-// Retrieves the full user details from the database using the ID from the session cookie.
 passport.deserializeUser(async (id, done) => {
+    console.log(`[Passport] Deserializing user: ${id}`);
     try {
-        console.log('[Passport] Deserializing user:', id);
         const user = await User.findById(id);
         done(null, user);
     } catch (err) {
         done(err, null);
     }
 });
-
-
-// --- Google OAuth 2.0 Strategy ---
-// This is the core logic for handling the Google login process.
-passport.use(
-    new GoogleStrategy({
-            // These options MUST match the settings in your Google Cloud Console.
-            clientID: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            // The callbackURL must be the absolute URL of your backend.
-            callbackURL: `${process.env.APP_BASE_URL}/api/auth/google/callback`,
-        },
-        // This 'verify' function is called after Google successfully authenticates the user.
-        async (accessToken, refreshToken, profile, done) => {
-            console.log('[Passport] Google Strategy: Received profile from Google.');
-            try {
-                // Check if a user with this Google ID already exists in your database.
-                console.log(`[Passport] Google Strategy: Searching for user with googleId: ${profile.id}`);
-                const existingUser = await User.findOne({ googleId: profile.id });
-
-                if (existingUser) {
-                    // If the user exists, return them to proceed with login.
-                    console.log('[Passport] Google Strategy: Found existing user.');
-                    return done(null, existingUser);
-                }
-
-                // If the user does not exist, create a new user in your database.
-                console.log('[Passport] Google Strategy: User not found. Creating new user.');
-                const newUser = new User({
-                    googleId: profile.id,
-                    displayName: profile.displayName,
-                    email: profile.emails[0].value,
-                    image: profile.photos[0].value,
-                });
-
-                await newUser.save();
-                console.log('[Passport] Google Strategy: Successfully saved new user.');
-                // Return the newly created user to proceed with login.
-                done(null, newUser);
-
-            } catch (err) {
-                // If any error occurs during the database operation, pass it to Passport.
-                console.error('[Passport] Google Strategy: An error occurred.', err);
-                return done(err, false);
-            }
-        }
-    )
-);
 
