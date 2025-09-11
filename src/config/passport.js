@@ -7,12 +7,14 @@ const User = require('../models/User'); // Ensure this path is correct
 
 // Saves the user's ID to the session cookie.
 passport.serializeUser((user, done) => {
+    console.log('[Passport] Serializing user:', user.id);
     done(null, user.id);
 });
 
 // Retrieves the full user details from the database using the ID from the session cookie.
 passport.deserializeUser(async (id, done) => {
     try {
+        console.log('[Passport] Deserializing user:', id);
         const user = await User.findById(id);
         done(null, user);
     } catch (err) {
@@ -33,16 +35,20 @@ passport.use(
         },
         // This 'verify' function is called after Google successfully authenticates the user.
         async (accessToken, refreshToken, profile, done) => {
+            console.log('[Passport] Google Strategy: Received profile from Google.');
             try {
                 // Check if a user with this Google ID already exists in your database.
+                console.log(`[Passport] Google Strategy: Searching for user with googleId: ${profile.id}`);
                 const existingUser = await User.findOne({ googleId: profile.id });
 
                 if (existingUser) {
                     // If the user exists, return them to proceed with login.
+                    console.log('[Passport] Google Strategy: Found existing user.');
                     return done(null, existingUser);
                 }
 
                 // If the user does not exist, create a new user in your database.
+                console.log('[Passport] Google Strategy: User not found. Creating new user.');
                 const newUser = new User({
                     googleId: profile.id,
                     displayName: profile.displayName,
@@ -51,12 +57,13 @@ passport.use(
                 });
 
                 await newUser.save();
+                console.log('[Passport] Google Strategy: Successfully saved new user.');
                 // Return the newly created user to proceed with login.
                 done(null, newUser);
 
             } catch (err) {
                 // If any error occurs during the database operation, pass it to Passport.
-                console.error('Error in Google Strategy:', err);
+                console.error('[Passport] Google Strategy: An error occurred.', err);
                 return done(err, false);
             }
         }
