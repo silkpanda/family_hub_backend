@@ -16,9 +16,6 @@ const householdRoutes = require('./routes/household.routes');
 const invitationRoutes = require('./routes/invitation.routes');
 const calendarRoutes = require('./routes/calendar.routes');
 const mealPlannerRoutes = require('./routes/mealPlanner.routes');
-const taskRoutes = require('./routes/task.routes');
-const rewardRoutes = require('./routes/reward.routes');
-
 
 const app = express();
 const server = http.createServer(app);
@@ -27,14 +24,14 @@ const server = http.createServer(app);
 connectDB();
 
 // --- Production Proxy Configuration ---
-// This is crucial. It tells Express to trust the headers sent by Render's proxy.
+// This is crucial for secure cookies to work behind a proxy like Render.
 app.set('trust proxy', 1);
 
 // --- CORS Configuration ---
 console.log(`CORS is configured to allow requests from: ${process.env.CLIENT_URL}`);
 const corsOptions = {
     origin: process.env.CLIENT_URL,
-    credentials: true, // Allow cookies to be sent
+    credentials: true,
 };
 app.use(cors(corsOptions));
 
@@ -57,10 +54,13 @@ app.use(
         store: MongoStore.create({
             mongoUrl: process.env.DATABASE_URL,
         }),
+        // --- THIS IS THE CRITICAL FIX ---
+        // These settings are required for cross-domain cookies to be
+        // accepted by modern browsers in a production environment.
         cookie: {
-            secure: true,      // Essential for HTTPS
+            secure: true,      // Requires HTTPS
             httpOnly: true,
-            sameSite: 'none',  // The KEY setting for cross-domain cookies
+            sameSite: 'none',  // Allows the cookie to be sent from a different domain
             maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
         },
     })
@@ -83,8 +83,6 @@ app.use('/api/households', householdRoutes);
 app.use('/api/invitations', invitationRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/meal-planner', mealPlannerRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/rewards', rewardRoutes);
 
 
 // --- WebSocket Connection Handling ---

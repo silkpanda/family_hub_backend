@@ -14,12 +14,13 @@ router.get('/google', passport.authenticate('google', {
 // After the user approves the login on Google's site, Google sends them back here.
 router.get(
     '/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login' }), // If login fails, send back to login page
-    (req, res) => {
-        // If authentication is successful, redirect to the frontend's main dashboard.
-        // It's crucial to use the CLIENT_URL from your environment variables.
-        res.redirect(process.env.CLIENT_URL || 'http://localhost:3000');
-    }
+    passport.authenticate('google', {
+        // --- THIS IS THE CRITICAL FIX ---
+        // On success, redirect to the frontend dashboard.
+        // On failure, redirect back to the frontend login page.
+        successRedirect: process.env.CLIENT_URL,
+        failureRedirect: `${process.env.CLIENT_URL}/login`
+    })
 );
 
 // --- Get Current User Session ---
