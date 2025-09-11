@@ -3,16 +3,16 @@ const calendarController = require('../controllers/calendar.controller');
 const router = express.Router({ mergeParams: true });
 
 // GET all events for the household
-router.get('/', calendarController.getEvents);
+// This route was changed from '/' to '/events' to match the frontend API call.
+router.get('/events', calendarController.getEvents);
 
 // POST a new event
-router.post('/', calendarController.addEvent);
+router.post('/events', calendarController.addEvent);
 
 // PUT to update an event
-router.put('/:eventId', calendarController.updateEvent);
+router.put('/events/:eventId', calendarController.updateEvent);
 
 // DELETE an event
-router.delete('/:eventId', calendarController.deleteEvent);
+router.delete('/events/:eventId', calendarController.deleteEvent);
 
 module.exports = router;
-
