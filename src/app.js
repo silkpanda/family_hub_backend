@@ -14,7 +14,8 @@ require('./config/passport');
 const authRoutes = require('./routes/auth.routes');
 const householdRoutes = require('./routes/household.routes');
 const invitationRoutes = require('./routes/invitation.routes');
-const calendarRoutes = require('./routes/calendar.routes'); // Assuming you have calendar routes
+const calendarRoutes = require('./routes/calendar.routes');
+const mealPlannerRoutes = require('./routes/mealPlanner.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -23,15 +24,15 @@ const server = http.createServer(app);
 connectDB();
 
 // --- Production Proxy Configuration ---
-// This is the crucial fix. It tells Express to trust the headers
-// sent by Render's proxy, which is necessary for secure cookies to work.
+// This tells Express to trust the headers sent by Render's proxy,
+// which is necessary for secure cookies and sessions to work correctly.
 app.set('trust proxy', 1);
 
 // --- CORS Configuration ---
 console.log(`CORS is configured to allow requests from: ${process.env.CLIENT_URL}`);
 const corsOptions = {
     origin: process.env.CLIENT_URL,
-    credentials: true,
+    credentials: true, // This allows cookies to be sent cross-origin
 };
 app.use(cors(corsOptions));
 
@@ -40,7 +41,6 @@ const io = new Server(server, {
     cors: corsOptions
 });
 app.set('socketio', io);
-
 
 // --- Middleware ---
 app.use(express.json());
@@ -51,14 +51,15 @@ app.use(
         secret: process.env.SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
+        // Store sessions in MongoDB to prevent memory leaks and persist logins
         store: MongoStore.create({
             mongoUrl: process.env.DATABASE_URL,
         }),
         cookie: {
-            secure: true, // Always secure in production
-            httpOnly: true,
-            sameSite: 'none', // Required for cross-site cookies
-            maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+            secure: true, // Ensures cookies are only sent over HTTPS
+            httpOnly: true, // Prevents client-side script access to the cookie
+            sameSite: 'none', // Required for cross-domain (Netlify -> Render) cookies
+            maxAge: 1000 * 60 * 60 * 24 * 7, // 7-day session lifetime
         },
     })
 );
@@ -69,7 +70,6 @@ app.use(passport.session());
 
 // --- Request Logger ---
 app.use((req, res, next) => {
-    // New log to check for a user session
     const userStatus = req.user ? `User: ${req.user.id}` : 'No User Session';
     console.log(`[Request Logger] Method: ${req.method}, URL: ${req.originalUrl} - (${userStatus})`);
     next();
@@ -79,7 +79,8 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/households', householdRoutes);
 app.use('/api/invitations', invitationRoutes);
-app.use('/api/calendar', calendarRoutes); // Make sure calendar routes are used
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/meal-planner', mealPlannerRoutes);
 
 
 // --- WebSocket Connection Handling ---
